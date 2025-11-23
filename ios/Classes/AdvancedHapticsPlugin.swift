@@ -88,10 +88,20 @@ public class AdvancedHapticsPlugin: NSObject, FlutterPlugin {
         return
       }
 
-      let key = FlutterDartProject.lookupKey(forAsset: path)
-      guard let ahapUrl = Bundle.main.url(forResource: key, withExtension: nil) else {
-        result(FlutterError(code: "FILE_NOT_FOUND", message: "AHAP file not found in assets", details: path))
-        return
+      // Support both absolute paths (e.g., tmp directory) and asset paths
+      let ahapUrl: URL
+      let fileUrl = URL(fileURLWithPath: path)
+      if FileManager.default.fileExists(atPath: path) {
+        // Use absolute path directly (e.g., from tmp directory)
+        ahapUrl = fileUrl
+      } else {
+        // Try to load from Flutter assets
+        let key = FlutterDartProject.lookupKey(forAsset: path)
+        guard let assetUrl = Bundle.main.url(forResource: key, withExtension: nil) else {
+          result(FlutterError(code: "FILE_NOT_FOUND", message: "AHAP file not found in assets or at path", details: path))
+          return
+        }
+        ahapUrl = assetUrl
       }
 
       do {
