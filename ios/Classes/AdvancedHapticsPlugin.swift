@@ -16,6 +16,11 @@ public class AdvancedHapticsPlugin: NSObject, FlutterPlugin {
   override init() {
     super.init()
     setupHapticEngine()
+    setupAppLifecycleObservers()
+  }
+
+  deinit {
+    NotificationCenter.default.removeObserver(self)
   }
 
   private func setupHapticEngine() {
@@ -39,6 +44,55 @@ public class AdvancedHapticsPlugin: NSObject, FlutterPlugin {
 
     } catch {
       print("Error creating haptic engine: \(error.localizedDescription)")
+    }
+  }
+
+  private func setupAppLifecycleObservers() {
+    // Handle app going to background
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAppWillResignActive),
+      name: UIApplication.willResignActiveNotification,
+      object: nil
+    )
+
+    // Handle app returning to foreground
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleAppDidBecomeActive),
+      name: UIApplication.didBecomeActiveNotification,
+      object: nil
+    )
+  }
+
+  @objc private func handleAppWillResignActive() {
+    // Stop the haptic engine when app goes to background
+    // This is automatically done by the system, but we can stop our player explicitly
+    do {
+      try advancedPlayer?.stop(atTime: CHHapticTimeImmediate)
+      advancedPlayer = nil
+      engine?.stop(completionHandler: { error in
+        if let error = error {
+          print("Error stopping haptic engine on background: \(error.localizedDescription)")
+        }
+      })
+    } catch {
+      print("Error stopping player on background: \(error.localizedDescription)")
+    }
+  }
+
+  @objc private func handleAppDidBecomeActive() {
+    // Restart the haptic engine when app returns to foreground
+    guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+    do {
+      // If engine is nil or stopped, recreate it
+      if engine == nil {
+        engine = try CHHapticEngine()
+      }
+      try engine?.start()
+      print("Haptic engine restarted on foreground")
+    } catch {
+      print("Error restarting haptic engine on foreground: \(error.localizedDescription)")
     }
   }
 
